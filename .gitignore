@@ -1,0 +1,26 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Flutter platform build directories
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/.symlinks/
+macos/Pods/
+windows/flutter/ephemeral/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
