@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
 
-void main() {
-  runApp(const SubtitleApp());
-}
+void main() => runApp(const SubtitleApp());
 
 class SubtitleApp extends StatelessWidget {
   const SubtitleApp({super.key});
@@ -26,16 +26,68 @@ class SubtitleHomePage extends StatefulWidget {
 }
 
 class _SubtitleHomePageState extends State<SubtitleHomePage> {
-  // 先用假数据占位：后面接入语音识别/翻译时替换这里
-  String original = 'Hello everyone, welcome to the demo.';
-  String translated = '大家好，欢迎来到演示。';
+  final _recorder = AudioRecorder();
+  Timer? _timer;
+
+  bool listening = false;
+  double level = 0.0; // 0~1
+
+  String original = '（等待识别…）';
+  String translated = '（等待翻译…）';
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _recorder.dispose();
+    super.dispose();
+  }
+
+  Future<void> start() async {
+    final ok = await _recorder.hasPermission();
+    if (!ok) {
+      setState(() => original = '麦克风权限未授予（请到系统设置里允许）');
+      return;
+    }
+
+    // 为了读取 amplitude，这里先录到临时文件（后面接实时识别会换成 PCM 流方案）
+    await _recorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
+      path: 'temp.wav',
+    );
+
+    setState(() {
+      listening = true;
+      original = '正在监听麦克风…（说话看看音量条是否跳动）';
+    });
+
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 100), (_) async {
+      final amp = await _recorder.getAmplitude();
+      final db = amp.current; // dBFS, 常见范围 [-60, 0]
+      final mapped = ((db + 60) / 60).clamp(0.0, 1.0);
+      if (mounted) setState(() => level = mapped);
+    });
+  }
+
+  Future<void> stop() async {
+    _timer?.cancel();
+    _timer = null;
+    await _recorder.stop();
+    setState(() {
+      listening = false;
+      level = 0.0;
+      original = '已停止监听';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Realtime Subtitle Translator'),
-      ),
+      appBar: AppBar(title: const Text('Realtime Subtitle Translator')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -43,17 +95,37 @@ class _SubtitleHomePageState extends State<SubtitleHomePage> {
             _SubtitleCard(title: 'Original', text: original),
             const SizedBox(height: 12),
             _SubtitleCard(title: 'Localized Translation', text: translated),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 12),
-            TextField(
-              decoration: const InputDecoration(
-                labelText: '模拟原文输入（后面由语音识别填充）',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (v) => setState(() => original = v),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Mic Level'),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(value: level, minHeight: 14),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('level: ${level.toStringAsFixed(2)}'),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilledButton(
+                  onPressed: listening ? null : start,
+                  child: const Text('Start'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: listening ? stop : null,
+                  child: const Text('Stop'),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextField(
               decoration: const InputDecoration(
                 labelText: '模拟译文输入（后面由翻译引擎填充）',
@@ -97,4 +169,3 @@ class _SubtitleCard extends StatelessWidget {
     );
   }
 }
-// TEST: hot reload should pick this up
