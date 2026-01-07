@@ -24,3 +24,25 @@ Thumbs.db
 
 # Logs
 *.log
+
+# =========================
+# Whisper.cpp / ML models
+# =========================
+
+# Whisper model binaries (VERY IMPORTANT)
+scripts/whispercpp/models/*.bin
+
+# Optional: other ML artifacts (future-proof)
+*.onnx
+*.pth
+*.pt
+
+# =========================
+# Realtime subtitle temp files
+# =========================
+
+# Temp audio chunks
+*.wav
+
+# Whisper output text
+*.txt
